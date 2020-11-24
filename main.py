@@ -2,39 +2,42 @@ import os
 import json
 import jsonschema
 
-
 schemasDirectory = os.path.join(os.path.abspath(os.getcwd()), 'task_folder', 'schema')
 jsonsDirectory = os.path.join(os.path.abspath(os.getcwd()), 'task_folder', 'event')
 
 schemasList = os.listdir(schemasDirectory)
 jsonsList = os.listdir(jsonsDirectory)
 
-for schema_filename in schemasList:
-    with open(os.path.join(schemasDirectory, schema_filename)) as schema_file:
-        schema = json.load(schema_file)
-    try:
-       jsonschema.Draft7Validator.check_schema(schema)
-    except Exception as ex:
-        print("Error with schema {}\n: {}".format(schema_filename, ex))
-        continue
-    for json_filename in jsonsList.copy():
-        with open(os.path.join(jsonsDirectory, json_filename)) as json_file:
-            json_data = json.load(json_file)
-        if json_data is None or len(json_data) == 0:
-            print("json file {} is empty".format(json_filename))
-            jsonsList.remove(json_filename)
+with open(os.path.join(os.path.abspath(os.getcwd()), 'README.md'), 'w') as outputFile:
+    for schemaFilename in schemasList:
+        with open(os.path.join(schemasDirectory, schemaFilename)) as schemaFile:
+            schema = json.load(schemaFile)
+        try:
+            jsonschema.Draft7Validator.check_schema(schema)
+        except Exception as ex:
+            outputFile.write("Error with schema {}\n: {};\n".format(schemaFilename, ex))
             continue
-        if json_data.get('event') is None:
-            print("json file {} has not event".format(json_filename))
-            jsonsList.remove(json_filename)
-            continue
-        if json_data['event'] == schema_filename.replace('.schema', ''):
-            validator = jsonschema.Draft7Validator(schema)
-            for error in sorted(validator.iter_errors(json_data), key=str):
-                print("error in file {} with schema {}\n: {}".format(json_filename, json_data['event'], error.message))
-            jsonsList.remove(json_filename)
+        for jsonFilename in jsonsList.copy():
+            with open(os.path.join(jsonsDirectory, jsonFilename)) as jsonFile:
+                json_data = json.load(jsonFile)
+            if json_data is None or len(json_data) == 0:
+                outputFile.write("json file {} is empty;\n".format(jsonFilename))
+                jsonsList.remove(jsonFilename)
+                continue
+            if json_data.get('event') is None:
+                outputFile.write("json file {} has not event;\n".format(jsonFilename))
+                jsonsList.remove(jsonFilename)
+                continue
+            if json_data['event'] == schemaFilename.replace('.schema', ''):
+                validator = jsonschema.Draft7Validator(schema)
+                errorString = "error in file {} with schema {}:\n".format(jsonFilename, json_data['event'])
+                for error in sorted(validator.iter_errors(json_data), key=str):
+                    errorString += "{};\n".format(error.message)
+                outputFile.write(errorString)
+                jsonsList.remove(jsonFilename)
 
-for json_filename in jsonsList:
-    with open(os.path.join(jsonsDirectory, json_filename)) as json_file:
-        json_data = json.load(json_file)
-    print("file {} with event {} does not fit any valid scheme".format(json_filename, json_data['event']))
+    for jsonFilename in jsonsList:
+        with open(os.path.join(jsonsDirectory, jsonFilename)) as jsonFile:
+            json_data = json.load(jsonFile)
+        outputFile.write("file {} with event {} does not fit any valid scheme;\n".format(jsonFilename,
+                                                                                         json_data['event']))
